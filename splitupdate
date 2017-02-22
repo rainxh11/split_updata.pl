@@ -35,8 +35,12 @@ use constant UINT_SIZE => 4;
 # If a filename wasn't specified on the commmand line then
 # assume the file to be unpacked is under current directory. 
 my $FILENAME = undef;
+my $matching = '.';
 if (@ARGV) {
 	$FILENAME = $ARGV[0];
+  if (scalar(@ARGV) >= 2) {
+    $matching = $ARGV[1];
+  }
 }
  
 open(INFILE, $FILENAME) or die "Cannot open $FILENAME: $!\n";
@@ -55,7 +59,7 @@ while (!eof(INFILE))
 	$fileLoc=&find_next_file($fileLoc);
 	#printf "fileLoc=%x\n",$fileLoc;
 	seek(INFILE, $fileLoc, 0);
-	$fileLoc=&dump_file();
+	$fileLoc=&dump_file($matching);
 }
 
 close INFILE;
@@ -83,6 +87,7 @@ sub dump_file {
     my $buffer = undef;
     my $calculatedCRC = undef;
     my $sourceCRC = undef;
+    my $matching = $_[0];
     
     # Verify the identifier matches.
     read(INFILE, $buffer, UINT_SIZE); # HeaderId
@@ -112,31 +117,36 @@ sub dump_file {
     read(INFILE, $buffer, $headerLength-98);
     $sourceCRC=slimhexdump($buffer);
     
-    print "extracting $fileType ($fileSize)...";
+    my ($fileName) = "$fileType" . ".img";
+    if ($fileName =~ /$matching/) {
+      print "extracting $fileName ($fileSize)...";
     
-    # Dump the payload.
-    read(INFILE, $buffer, $dataLength);
-    open(OUTFILE, ">$BASEPATH$fileType.img") or die "Unable to create $fileType.img: $!\n";
-    binmode OUTFILE;
-    print OUTFILE $buffer;
-    close OUTFILE;
+      # Dump the payload.
+      read(INFILE, $buffer, $dataLength);
+      open(OUTFILE, ">$BASEPATH$fileName") or die "Unable to create $fileName: $!\n";
+      binmode OUTFILE;
+      print OUTFILE $buffer;
+      close OUTFILE;
 
-		print "\r";
-		print "verifying checksum for $fileType ($fileSize)...";
+		  print "\r";
+		  print "verifying checksum for $fileType ($fileSize)...";
 
-    $calculatedCRC=`./crc $BASEPATH$fileType.img` if $CRC_CHECK;
-    chomp($calculatedCRC) if $CRC_CHECK;
+      $calculatedCRC=`./crc $BASEPATH$fileType.img` if $CRC_CHECK;
+      chomp($calculatedCRC) if $CRC_CHECK;
 
-		print "\r";
-    printf "%*v2.2X", '', $fileSeq;
-    print " $fileType $fileSize $fileDate $fileTime";
-    
-    if($CRC_CHECK){
-    	if (!$calculatedCRC eq $sourceCRC)
-			{
-				print " - !!! CRC ERROR";
-			}
+		  print "\r";
+      printf "%*v2.2X", '', $fileSeq;
+      if($CRC_CHECK){
+			  if (!$calculatedCRC eq $sourceCRC)
+			  {
+				  print " - !!! CRC ERROR";
+			  }
+      }
     }
+    else {
+      seek(INFILE, $dataLength, 1);
+    }
+    print " $fileType $fileSize $fileDate $fileTime";
     
     print "\n";
     
