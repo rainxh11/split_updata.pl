@@ -9,4 +9,4 @@ chmod +x splitupdate
 ./splitupdate UPDATE.APP
 ```
 
-The img files will be extracted in the /output/ folder.
+The img files will be extracted in the `UPDATE.APP.extracted` folder.
